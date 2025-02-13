@@ -6,9 +6,18 @@ mod blinkenbox {
     use esp_backtrace as _;
     use esp_hal::gpio::{Event, Input, Level, Output, Pull};
     use esp_println::println;
+    use rtic_monotonics::esp32c3::prelude::*;
     use rtic_sync::{channel::Receiver, channel::Sender, make_channel};
 
+    #[derive(Debug)]
+    struct InEvent {
+        time: fugit::Instant<u64, 1, 16000000>,
+        gpios: u32,
+    }
+
     const CAPACITY: usize = 3;
+
+    esp32c3_systimer_monotonic!(Mono);
 
     #[shared]
     struct Shared {}
@@ -17,8 +26,8 @@ mod blinkenbox {
     struct Local {
         buttons: [Input<'static>; 3],
         outputs: [Output<'static>; 6],
-        gpio_rx: Receiver<'static, u8, CAPACITY>,
-        gpio_tx: Sender<'static, u8, CAPACITY>,
+        gpio_rx: Receiver<'static, InEvent, CAPACITY>,
+        gpio_tx: Sender<'static, InEvent, CAPACITY>,
     }
 
     #[init]
@@ -46,7 +55,7 @@ mod blinkenbox {
         ];
 
         // Communication
-        let (gpio_tx, gpio_rx) = make_channel!(u8, CAPACITY);
+        let (gpio_tx, gpio_rx) = make_channel!(InEvent, CAPACITY);
 
         // Threads
         pin_setter::spawn().unwrap();
@@ -65,24 +74,34 @@ mod blinkenbox {
     #[task(priority = 1, local=[gpio_rx, outputs])]
     async fn pin_setter(cx: pin_setter::Context) {
         loop {
-            if let Ok(msg) = cx.local.gpio_rx.recv().await {
-                if let Some(gpio) = cx.local.outputs.get_mut::<usize>(msg as _) {
-                    gpio.toggle();
+            match cx.local.gpio_rx.recv().await {
+                Ok(msg) => {
+                    println!("{}: {}", msg.time, msg.gpios);
+                    if let Some(gpio) = cx.local.outputs.get_mut::<usize>(0) {
+                        gpio.toggle();
+                    }
                 }
-            } else {
-                println!("ERROR receiving message");
+                Err(err) => println!("ERROR receiving message: {:?}", err),
             }
         }
     }
 
     #[task(priority = 2, binds=GPIO, local=[buttons, gpio_tx])]
     fn gpio_handler(cx: gpio_handler::Context) {
-        for button in cx.local.buttons {
+        let time = Mono::now();
+        let mut gpios = 0;
+        for (i, button) in cx.local.buttons.iter_mut().enumerate() {
             button.clear_interrupt();
+            if button.is_high() {
+                gpios |= 1 << i;
+            }
         }
-        let res = cx.local.gpio_tx.try_send(0);
-        if res.is_err() {
-            println!("ERROR sending from GPIO handler: {:?}", res);
+
+        let msg = InEvent { time, gpios };
+
+        let res = cx.local.gpio_tx.try_send(msg);
+        if let Err(err) = res {
+            println!("ERROR sending from GPIO handler: {:?}", err);
         }
     }
 }
