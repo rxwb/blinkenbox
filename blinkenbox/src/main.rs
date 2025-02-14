@@ -24,7 +24,7 @@ mod blinkenbox {
 
     #[local]
     struct Local {
-        buttons: [Input<'static>; 3],
+        inputs: [Input<'static>; 3],
         outputs: [Output<'static>; 6],
         gpio_rx: Receiver<'static, InEvent, CAPACITY>,
         gpio_tx: Sender<'static, InEvent, CAPACITY>,
@@ -35,13 +35,13 @@ mod blinkenbox {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         // Inputs
-        let mut buttons = [
+        let mut inputs = [
             Input::new(peripherals.GPIO8, Pull::Up),
             Input::new(peripherals.GPIO9, Pull::Up),
             Input::new(peripherals.GPIO10, Pull::Up),
         ];
-        for button in buttons.iter_mut() {
-            button.listen(Event::FallingEdge);
+        for input in inputs.iter_mut() {
+            input.listen(Event::FallingEdge);
         }
 
         // Outputs
@@ -63,7 +63,7 @@ mod blinkenbox {
         (
             Shared {},
             Local {
-                buttons,
+                inputs,
                 outputs,
                 gpio_rx,
                 gpio_tx,
@@ -86,13 +86,13 @@ mod blinkenbox {
         }
     }
 
-    #[task(priority = 2, binds=GPIO, local=[buttons, gpio_tx])]
+    #[task(priority = 2, binds=GPIO, local=[inputs, gpio_tx])]
     fn gpio_handler(cx: gpio_handler::Context) {
         let time = Mono::now();
         let mut gpios = 0;
-        for (i, button) in cx.local.buttons.iter_mut().enumerate() {
-            button.clear_interrupt();
-            if button.is_high() {
+        for (i, input) in cx.local.inputs.iter_mut().enumerate() {
+            input.clear_interrupt();
+            if input.is_high() {
                 gpios |= 1 << i;
             }
         }
