@@ -6,6 +6,7 @@ mod blinkenbox {
     use esp_backtrace as _;
     use esp_hal::gpio::{Event, Input, Level, Output, Pull};
     use esp_println::println;
+    use heapless::LinearMap;
     use rtic_monotonics::esp32c3::prelude::*;
     use rtic_sync::{channel::Receiver, channel::Sender, make_channel};
 
@@ -13,6 +14,17 @@ mod blinkenbox {
     struct InEvent {
         time: fugit::Instant<u64, 1, 16000000>,
         gpios: u32,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+    enum PinId {
+        P1 = 1,
+        P6 = 6,
+        P7 = 7,
+        P11 = 11,
+        P20 = 20,
+        P21 = 21,
     }
 
     const CAPACITY: usize = 3;
@@ -25,7 +37,7 @@ mod blinkenbox {
     #[local]
     struct Local {
         inputs: [Input<'static>; 3],
-        outputs: [Output<'static>; 6],
+        outputs: LinearMap<PinId, Output<'static>, 6>,
         gpio_rx: Receiver<'static, InEvent, CAPACITY>,
         gpio_tx: Sender<'static, InEvent, CAPACITY>,
     }
@@ -45,14 +57,14 @@ mod blinkenbox {
         }
 
         // Outputs
-        let outputs = [
-            Output::new(peripherals.GPIO11, Level::Low),
-            Output::new(peripherals.GPIO1, Level::Low),
-            Output::new(peripherals.GPIO6, Level::Low),
-            Output::new(peripherals.GPIO7, Level::Low),
-            Output::new(peripherals.GPIO20, Level::Low),
-            Output::new(peripherals.GPIO21, Level::Low),
-        ];
+        let outputs = LinearMap::from_iter([
+            (PinId::P1, Output::new(peripherals.GPIO1, Level::Low)),
+            (PinId::P6, Output::new(peripherals.GPIO6, Level::Low)),
+            (PinId::P7, Output::new(peripherals.GPIO7, Level::Low)),
+            (PinId::P11, Output::new(peripherals.GPIO11, Level::Low)),
+            (PinId::P20, Output::new(peripherals.GPIO20, Level::Low)),
+            (PinId::P21, Output::new(peripherals.GPIO21, Level::Low)),
+        ]);
 
         // Communication
         let (gpio_tx, gpio_rx) = make_channel!(InEvent, CAPACITY);
@@ -77,7 +89,7 @@ mod blinkenbox {
             match cx.local.gpio_rx.recv().await {
                 Ok(msg) => {
                     println!("{}: {}", msg.time, msg.gpios);
-                    if let Some(gpio) = cx.local.outputs.get_mut::<usize>(0) {
+                    if let Some(gpio) = cx.local.outputs.get_mut(&PinId::P11) {
                         gpio.toggle();
                     }
                 }

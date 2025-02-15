@@ -15,6 +15,9 @@ bench = false
 
 [workspace]
 
+[dependencies]
+heapless = "0.8.0"
+
 [dependencies.rtic]
 version = "2.1.1"
 features = ["riscv-esp32c3-backend"]
