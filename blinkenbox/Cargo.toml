@@ -30,7 +30,7 @@ features = ["esp32c3-systimer"]
 version= "1.3.0"
 
 [dependencies.esp32c3]
-version = "0.27.0"
+version = "0.28.0"
 features = ["critical-section"]
 
 [dependencies.esp-hal]
