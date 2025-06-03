@@ -47,7 +47,7 @@ features = [
 ]
 
 [dependencies.esp-println]
-version = "0.13.0"
+version = "0.14.0"
 features = ["esp32c3"]
 
 [profile.release]
