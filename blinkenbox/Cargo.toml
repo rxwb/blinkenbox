@@ -34,7 +34,7 @@ version = "0.27.0"
 features = ["critical-section"]
 
 [dependencies.esp-hal]
-version = "0.23.1"
+version = "1.0.0"
 features = ["esp32c3"]
 
 [dependencies.esp-backtrace]
